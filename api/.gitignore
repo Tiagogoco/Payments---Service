@@ -1,0 +1,16 @@
+# Secretos — nunca subir
+.env
+.env.local
+.env.*.local
+
+# Dependencias
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Build / cache
+dist/
+.cache/
+CLAUDE.md
