@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: Payments Service API
+  version: 1.0.0
+  description: >
+    Microservicio de Pagos para ShopScale. Procesa pagos simulados e integra
+    proveedores externos (ej. PayPal). Incluye idempotencia para evitar cobros
+    duplicados en reintentos.
+servers:
+  - url: http://localhost:3000
+    description: Local
+tags:
+  - name: Payments
+    description: Operaciones de procesamiento de pagos
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Clave de idempotencia para evitar procesar cobros duplicados si el cliente reintenta.
+        Debe ser única por intento lógico de cobro.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+      examples:
+        ok:
+          value: "idem_7f4b2c0a9d1e4c2b"
+
+  schemas:
+    PaymentMethod:
+      type: string
+      description: Método de pago.
+      enum: [card, cash, paypal]
+      example: card
+
+    Currency:
+      type: string
+      description: Moneda ISO 4217 (simplificado).
+      example: MXN
+      minLength: 3
+      maxLength: 3
+
+    PaymentStatus:
+      type: string
+      description: Estado del pago dentro del sistema.
+      enum: [created, approved, declined, failed]
+      example: approved
+
+    PaymentProvider:
+      type: string
+      description: Proveedor externo (si aplica).
+      enum: [internal, paypal]
+      example: internal
+
+    CreatePaymentRequest:
+      type: object
+      required: [orderId, amount, method, currency]
+      additionalProperties: false
+      properties:
+        orderId:
+          type: string
+          description: ID de la orden a cobrar (debe existir).
+          minLength: 1
+          example: "ord_100200300"
+        amount:
+          type: number
+          format: float
+          description: Monto a cobrar (debe ser mayor a 0).
+          exclusiveMinimum: 0
+          example: 599.99
+        currency:
+          $ref: "#/components/schemas/Currency"
+        method:
+          $ref: "#/components/schemas/PaymentMethod"
+        metadata:
+          type: object
+          description: Metadatos opcionales (no afectan la lógica).
+          additionalProperties: true
+      examples:
+        valid:
+          summary: Petición válida
+          value:
+            orderId: "ord_100200300"
+            amount: 599.99
+            currency: "MXN"
+            method: "card"
+            metadata:
+              checkoutId: "chk_abc123"
+
+    CreateExternalPaymentRequest:
+      type: object
+      required: [orderId, amount, method, currency, provider]
+      additionalProperties: false
+      properties:
+        orderId:
+          type: string
+          minLength: 1
+          example: "ord_100200300"
+        amount:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          example: 599.99
+        currency:
+          $ref: "#/components/schemas/Currency"
+        method:
+          type: string
+          description: Debe ser un método soportado por proveedor externo.
+          enum: [paypal]
+          example: paypal
+        provider:
+          type: string
+          description: Proveedor externo seleccionado.
+          enum: [paypal]
+          example: paypal
+        payer:
+          type: object
+          description: Datos mínimos del pagador para el proveedor (opcional según implementación).
+          additionalProperties: false
+          properties:
+            email:
+              type: string
+              format: email
+              example: "cliente@correo.com"
+      examples:
+        valid:
+          summary: Petición válida (PayPal)
+          value:
+            orderId: "ord_100200300"
+            amount: 599.99
+            currency: "MXN"
+            method: "paypal"
+            provider: "paypal"
+            payer:
+              email: "cliente@correo.com"
+
+    Payment:
+      type: object
+      required:
+        - id
+        - orderId
+        - amount
+        - currency
+        - method
+        - status
+        - provider
+        - idempotencyKey
+        - createdAt
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: "pay_9b1c2d3e4f"
+        orderId:
+          type: string
+          example: "ord_100200300"
+        amount:
+          type: number
+          format: float
+          example: 599.99
+        currency:
+          $ref: "#/components/schemas/Currency"
+        method:
+          $ref: "#/components/schemas/PaymentMethod"
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        providerReference:
+          type: string
+          description: ID de referencia devuelto por el proveedor (si aplica).
+          nullable: true
+          example: "PAYPAL-TXN-88990011"
+        idempotencyKey:
+          type: string
+          example: "idem_7f4b2c0a9d1e4c2b"
+        message:
+          type: string
+          description: Mensaje opcional (aprobado/rechazado/motivo).
+          nullable: true
+          example: "Payment approved"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-13T18:10:00Z"
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          example: "BadRequest"
+        message:
+          type: string
+          example: "amount must be greater than 0"
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Datos inválidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            invalidAmount:
+              value:
+                error: "BadRequest"
+                message: "amount must be greater than 0"
+            invalidMethod:
+              value:
+                error: "BadRequest"
+                message: "method is not allowed"
+            missingIdempotency:
+              value:
+                error: "BadRequest"
+                message: "Idempotency-Key header is required"
+
+    NotFound:
+      description: Orden inexistente
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            orderNotFound:
+              value:
+                error: "NotFound"
+                message: "orderId does not exist"
+
+    PaymentRequired:
+      description: Pago rechazado / fondos insuficientes (proveedor externo)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            declined:
+              value:
+                error: "PaymentRequired"
+                message: "payment rejected by provider"
+
+    BadGateway:
+      description: Error de comunicación con proveedor externo (ej. PayPal)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            paypalDown:
+              value:
+                error: "BadGateway"
+                message: "unable to communicate with PayPal"
+
+paths:
+  /api/payments:
+    post:
+      tags: [Payments]
+      summary: Procesar pago (simulado/interno)
+      description: >
+        Verifica que la orden exista, el monto sea válido (> 0), el método esté permitido,
+        y que la solicitud no sea duplicada usando Idempotency-Key. Si todo es correcto,
+        procesa el pago y guarda el resultado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentRequest"
+            examples:
+              valid:
+                $ref: "#/components/schemas/CreatePaymentRequest/examples/valid"
+              invalid:
+                summary: Petición inválida (amount = 0)
+                value:
+                  orderId: "ord_100200300"
+                  amount: 0
+                  currency: "MXN"
+                  method: "card"
+      responses:
+        "201":
+          description: Created (éxito)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+              examples:
+                created:
+                  value:
+                    id: "pay_9b1c2d3e4f"
+                    orderId: "ord_100200300"
+                    amount: 599.99
+                    currency: "MXN"
+                    method: "card"
+                    status: "approved"
+                    provider: "internal"
+                    providerReference: null
+                    idempotencyKey: "idem_7f4b2c0a9d1e4c2b"
+                    message: "Payment approved"
+                    createdAt: "2026-02-13T18:10:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Consultar un pago específico
+      description: Obtiene el detalle de un pago por su identificador.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: ID único del pago.
+          schema:
+            type: string
+            minLength: 1
+          example: "pay_9b1c2d3e4f"
+      responses:
+        "200":
+          description: OK (pago encontrado)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+              examples:
+                found:
+                  value:
+                    id: "pay_9b1c2d3e4f"
+                    orderId: "ord_100200300"
+                    amount: 599.99
+                    currency: "MXN"
+                    method: "card"
+                    status: "approved"
+                    provider: "internal"
+                    providerReference: null
+                    idempotencyKey: "idem_7f4b2c0a9d1e4c2b"
+                    message: "Payment approved"
+                    createdAt: "2026-02-13T18:10:00Z"
+        "404":
+          description: Pago no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                paymentNotFound:
+                  value:
+                    error: "NotFound"
+                    message: "paymentId does not exist"
+
+  /api/payments/external:
+    post:
+      tags: [Payments]
+      summary: Procesar pago con proveedor externo (PayPal)
+      description: >
+        Verifica que la orden exista, el monto sea válido y que el método corresponda a un
+        proveedor externo (PayPal). Envía la solicitud al proveedor, recibe respuesta
+        (aprobado/rechazado) y guarda el resultado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExternalPaymentRequest"
+            examples:
+              valid:
+                $ref: "#/components/schemas/CreateExternalPaymentRequest/examples/valid"
+              invalidMethod:
+                summary: Petición inválida (method no es paypal)
+                value:
+                  orderId: "ord_100200300"
+                  amount: 599.99
+                  currency: "MXN"
+                  method: "card"
+                  provider: "paypal"
+      responses:
+        "200":
+          description: OK (pago aprobado por el proveedor)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+              examples:
+                approved:
+                  value:
+                    id: "pay_aa11bb22cc"
+                    orderId: "ord_100200300"
+                    amount: 599.99
+                    currency: "MXN"
+                    method: "paypal"
+                    status: "approved"
+                    provider: "paypal"
+                    providerReference: "PAYPAL-TXN-88990011"
+                    idempotencyKey: "idem_7f4b2c0a9d1e4c2b"
+                    message: "Approved by PayPal"
+                    createdAt: "2026-02-13T18:12:00Z"
+        "201":
+          description: Created (pago registrado correctamente)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+              examples:
+                recorded:
+                  value:
+                    id: "pay_dd33ee44ff"
+                    orderId: "ord_100200300"
+                    amount: 599.99
+                    currency: "MXN"
+                    method: "paypal"
+                    status: "created"
+                    provider: "paypal"
+                    providerReference: "PAYPAL-TXN-88990011"
+                    idempotencyKey: "idem_7f4b2c0a9d1e4c2b"
+                    message: "Payment recorded"
+                    createdAt: "2026-02-13T18:12:01Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
