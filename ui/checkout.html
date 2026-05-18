@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pago — Urban Market</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f5f6f8;
+      --surface:   #ffffff;
+      --border:    #e3e7ef;
+      --border-2:  #cdd3de;
+      --blue:      #1a56db;
+      --blue-h:    #1446b8;
+      --blue-dim:  #eef2fd;
+      --pp-yellow: #FFD140;
+      --pp-blue:   #003087;
+      --green:     #16a34a;
+      --green-dim: #f0fdf4;
+      --red:       #dc2626;
+      --red-dim:   #fef2f2;
+      --text:      #111827;
+      --text-2:    #4b5563;
+      --text-3:    #9ca3af;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow:    0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06);
+      --r:         10px;
+      --r-sm:      6px;
+      --font:      'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html { font-size: 15px; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── TOPBAR ─────────────────────────────── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .logo span { color: var(--blue); }
+
+    .secure-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .secure-badge svg { width: 13px; height: 13px; color: var(--green); }
+
+    /* ── DEV BANNER ─────────────────────────── */
+    .dev-banner {
+      background: #fffbeb;
+      border-bottom: 1px solid #fde68a;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #92400e;
+    }
+    .dev-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .dev-banner a { color: var(--blue); font-weight: 600; text-decoration: none; }
+    .dev-banner a:hover { text-decoration: underline; }
+    .dev-banner.hidden { display: none; }
+
+    /* ── MAIN LAYOUT ────────────────────────── */
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 0;
+      max-width: 980px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 36px 20px;
+      align-items: start;
+      gap: 28px;
+    }
+
+    /* ── CARD ────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .card-header p {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 2px;
+    }
+
+    .card-body { padding: 20px 24px; }
+
+    /* ── PAYMENT METHOD TABS ─────────────────── */
+    .method-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .method-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-2);
+      min-height: 56px;
+    }
+    .method-tab:hover { border-color: var(--border-2); }
+
+    .method-tab.active.card-tab {
+      border-color: var(--blue);
+      background: var(--blue-dim);
+      color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(26,86,219,.1);
+    }
+    .method-tab.active.paypal-tab {
+      border-color: #e6b800;
+      background: #fffbeb;
+      color: var(--pp-blue);
+      box-shadow: 0 0 0 3px rgba(255,209,64,.2);
+    }
+    .method-tab svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── CARD FORM ───────────────────────────── */
+    .card-form { display: flex; flex-direction: column; gap: 14px; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: .01em;
+    }
+
+    .input-wrap { position: relative; }
+    .input-wrap input {
+      width: 100%;
+      font-family: var(--font);
+      font-size: 15px;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      letter-spacing: .02em;
+    }
+    .input-wrap input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(26,86,219,.1);
+    }
+    .input-wrap input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,.1); }
+    .input-wrap input::placeholder { color: var(--text-3); letter-spacing: 0; }
+
+    .card-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 4px;
+    }
+    .card-icon svg { width: 32px; height: 20px; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .field-error { font-size: 11px; color: var(--red); margin-top: 1px; display: none; }
+    .field-error.show { display: block; }
+
+    /* ── SUBMIT BTN ─────────────────────────── */
+    .pay-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--blue);
+      border: none;
+      border-radius: var(--r-sm);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+      box-shadow: 0 2px 8px rgba(26,86,219,.3);
+      min-height: 50px;
+    }
+    .pay-btn:hover { background: var(--blue-h); box-shadow: 0 4px 16px rgba(26,86,219,.35); }
+    .pay-btn:active { transform: scale(.99); }
+    .pay-btn:disabled { background: #93c5fd; cursor: not-allowed; box-shadow: none; }
+
+    .pay-btn.pp-btn {
+      background: var(--pp-yellow);
+      color: var(--pp-blue);
+      box-shadow: 0 2px 8px rgba(255,209,64,.4);
+    }
+    .pay-btn.pp-btn:hover { background: #f5c800; box-shadow: 0 4px 16px rgba(255,209,64,.5); }
+    .pay-btn.pp-btn:disabled { background: #fde68a; cursor: not-allowed; box-shadow: none; }
+
+    .sim-note {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .sim-note svg { width: 12px; height: 12px; }
+
+    /* ── ERROR ALERT ─────────────────────────── */
+    .error-alert {
+      background: var(--red-dim);
+      border: 1px solid #fca5a5;
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--red);
+      display: none;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+    .error-alert.show { display: block; }
+    .error-alert strong { display: block; font-weight: 700; margin-bottom: 2px; }
+
+    /* ── PAYPAL REDIRECT SCREEN ──────────────── */
+    .paypal-redirect {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      gap: 20px;
+      text-align: center;
+    }
+    .paypal-redirect.show { display: flex; }
+
+    .pp-logo { width: 120px; }
+
+    .pp-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--pp-blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .pp-label { font-size: 14px; color: var(--text-2); font-weight: 500; }
+
+    .pp-progress-track {
+      width: 100%;
+      max-width: 260px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .pp-progress-bar {
+      height: 100%;
+      background: var(--pp-blue);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 2s linear;
+    }
+
+    /* ── SUCCESS SCREEN ─────────────────────── */
+    .success-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 40px 24px 32px;
+      gap: 0;
+    }
+    .success-screen.show { display: flex; }
+
+    .checkmark-wrap {
+      width: 72px; height: 72px;
+      background: var(--green-dim);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .checkmark-circle {
+      stroke: var(--green);
+      stroke-width: 2;
+      fill: none;
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      animation: circle-draw .6s ease-out forwards;
+    }
+    .checkmark-tick {
+      stroke: var(--green);
+      stroke-width: 2.5;
+      fill: none;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: tick-draw .4s ease-out .5s forwards;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    @keyframes circle-draw { to { stroke-dashoffset: 0; } }
+    @keyframes tick-draw   { to { stroke-dashoffset: 0; } }
+
+    .success-screen h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .success-screen p {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 24px;
+    }
+
+    .receipt {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 14px 16px;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    .receipt-row:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .receipt-row .label { color: var(--text-3); }
+    .receipt-row .value { font-weight: 600; color: var(--text); font-family: 'Courier New', monospace; font-size: 11px; }
+    .receipt-row.total .label { color: var(--text); font-weight: 700; font-size: 13px; }
+    .receipt-row.total .value { color: var(--green); font-size: 14px; font-family: var(--font); }
+
+    .back-btn {
+      padding: 12px 28px;
+      background: var(--blue);
+      border: none;
+      border-radius: var(--r-sm);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .back-btn:hover { background: var(--blue-h); }
+
+    /* ── ORDER SUMMARY ───────────────────────── */
+    .order-summary { position: sticky; top: 20px; }
+
+    .item-list { display: flex; flex-direction: column; gap: 0; }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .item:first-child { padding-top: 0; }
+    .item-img {
+      width: 52px; height: 52px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 22px;
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+    .item-qty  { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .item-price { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; }
+
+    .totals { margin-top: 4px; }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 7px 0;
+      color: var(--text-2);
+    }
+    .total-row.final {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text);
+      border-top: 2px solid var(--border);
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+
+    .trust-badges {
+      display: flex;
+      gap: 14px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-3);
+    }
+    .trust-badge svg { width: 14px; height: 14px; }
+
+    /* ── RESPONSIVE ─────────────────────────── */
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+        padding: 16px;
+        gap: 16px;
+      }
+      .order-summary { position: static; order: -1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .pp-progress-bar { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">Urban<span>Market</span></div>
+  <div class="secure-badge">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z"/>
+      <path d="M5.5 8l2 2 3-3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Pago seguro
+  </div>
+</header>
+
+
+<!-- MAIN -->
+<main class="layout">
+
+  <!-- PAYMENT PANEL -->
+  <section aria-label="Formulario de pago">
+    <div class="card">
+      <div class="card-header">
+        <h2>Método de pago</h2>
+        <p>Selecciona cómo quieres pagar tu pedido</p>
+      </div>
+
+      <div class="card-body">
+
+        <!-- METHOD TABS -->
+        <div class="method-tabs" role="tablist" aria-label="Método de pago">
+          <button class="method-tab card-tab active" id="tab-card" role="tab" aria-selected="true"
+                  aria-controls="panel-card" onclick="selectMethod('card')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <rect x="2" y="5" width="20" height="14" rx="2"/>
+              <path d="M2 10h20M6 15h4" stroke-linecap="round"/>
+            </svg>
+            Tarjeta
+          </button>
+          <button class="method-tab paypal-tab" id="tab-paypal" role="tab" aria-selected="false"
+                  aria-controls="panel-paypal" onclick="selectMethod('paypal')">
+            <!-- PayPal logo SVG (simplified) -->
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
+              <path d="M19.5 7.5C19.5 11.09 16.59 14 13 14H10L8.5 20H5l3-13h6.5C17.43 7 19.5 8.57 19.5 7.5z" fill="#009cde"/>
+              <path d="M17 5C17 8.59 14.09 11.5 10.5 11.5H7.5L6 17H2.5l3-13H12C14.93 4 17 5.57 17 5z" fill="#012169"/>
+            </svg>
+            PayPal
+          </button>
+        </div>
+
+        <!-- CARD PANEL -->
+        <div id="panel-card" role="tabpanel" aria-labelledby="tab-card">
+          <form class="card-form" id="cardForm" onsubmit="submitCard(event)" novalidate>
+
+            <div class="field">
+              <label for="cardNumber">Número de tarjeta</label>
+              <div class="input-wrap">
+                <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456"
+                       maxlength="19" inputmode="numeric" autocomplete="cc-number"
+                       aria-describedby="cardNumberErr" oninput="formatCardNumber(this)"/>
+                <div class="card-icon" id="cardIcon" aria-hidden="true">
+                  <!-- Visa default -->
+                  <svg id="iconVisa" viewBox="0 0 32 20" fill="none">
+                    <rect width="32" height="20" rx="3" fill="#1A1F71"/>
+                    <text x="4" y="14" font-family="Helvetica" font-size="9" font-weight="bold" fill="white">VISA</text>
+                  </svg>
+                </div>
+              </div>
+              <span class="field-error" id="cardNumberErr" role="alert"></span>
+            </div>
+
+            <div class="field">
+              <label for="cardName">Nombre del titular</label>
+              <div class="input-wrap">
+                <input type="text" id="cardName" placeholder="Como aparece en la tarjeta"
+                       autocomplete="cc-name" aria-describedby="cardNameErr"
+                       style="text-transform:uppercase"/>
+              </div>
+              <span class="field-error" id="cardNameErr" role="alert"></span>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="cardExpiry">Vencimiento</label>
+                <div class="input-wrap">
+                  <input type="text" id="cardExpiry" placeholder="MM/AA"
+                         maxlength="5" inputmode="numeric" autocomplete="cc-exp"
+                         aria-describedby="cardExpiryErr" oninput="formatExpiry(this)"/>
+                </div>
+                <span class="field-error" id="cardExpiryErr" role="alert"></span>
+              </div>
+              <div class="field">
+                <label for="cardCvc">CVC</label>
+                <div class="input-wrap">
+                  <input type="password" id="cardCvc" placeholder="•••"
+                         maxlength="4" inputmode="numeric" autocomplete="cc-csc"
+                         aria-describedby="cardCvcErr"/>
+                </div>
+                <span class="field-error" id="cardCvcErr" role="alert"></span>
+              </div>
+            </div>
+
+            <div class="error-alert" id="cardError" role="alert">
+              <strong>Error al procesar el pago</strong>
+              <span id="cardErrorMsg"></span>
+            </div>
+
+            <button type="submit" class="pay-btn" id="cardSubmit">
+              Pagar $2,976.00 MXN
+            </button>
+
+            <p class="sim-note">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z"/>
+              </svg>
+              Simulado — no se realizará ningún cargo real
+            </p>
+          </form>
+        </div>
+
+        <!-- PAYPAL PANEL -->
+        <div id="panel-paypal" role="tabpanel" aria-labelledby="tab-paypal" style="display:none">
+
+          <!-- PayPal CTA -->
+          <div id="paypalCta">
+            <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
+              Serás redirigido a PayPal para completar tu pago de forma segura.
+              Puedes usar tu cuenta PayPal o pagar con tarjeta desde ahí.
+            </p>
+
+            <div class="error-alert" id="paypalError" role="alert">
+              <strong>Error al conectar con PayPal</strong>
+              <span id="paypalErrorMsg"></span>
+            </div>
+
+            <button class="pay-btn pp-btn" id="paypalSubmit" onclick="startPaypal()">
+              <!-- PayPal wordmark -->
+              <svg height="20" viewBox="0 0 80 20" fill="none" aria-label="PayPal" style="margin-right:4px">
+                <text y="15" font-family="Helvetica" font-size="13" font-weight="bold">
+                  <tspan fill="#003087">Pay</tspan><tspan fill="#009cde">Pal</tspan>
+                </text>
+              </svg>
+              Continuar con PayPal
+            </button>
+
+            <p class="sim-note" style="margin-top:10px">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z"/>
+              </svg>
+              Simulado — no se realizará ningún cargo real
+            </p>
+          </div>
+
+          <!-- PayPal redirect animation -->
+          <div class="paypal-redirect" id="paypalRedirect" aria-live="polite" aria-busy="true">
+            <svg class="pp-logo" viewBox="0 0 120 32" fill="none" aria-label="PayPal">
+              <text y="24" font-family="Helvetica" font-size="24" font-weight="bold">
+                <tspan fill="#003087">Pay</tspan><tspan fill="#009cde">Pal</tspan>
+              </text>
+            </svg>
+            <div class="pp-spinner" aria-hidden="true"></div>
+            <p class="pp-label">Redirigiendo a PayPal...</p>
+            <div class="pp-progress-track" aria-hidden="true">
+              <div class="pp-progress-bar" id="ppBar"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ORDER SUMMARY -->
+  <aside class="order-summary" aria-label="Resumen del pedido">
+    <div class="card">
+      <div class="card-header">
+        <h2>Resumen del pedido</h2>
+        <p>Urban Market · <code style="font-size:11px;color:var(--text-3)">ord_demo_urbanmarket_001</code></p>
+      </div>
+      <div class="card-body">
+        <div class="item-list">
+          <div class="item">
+            <div class="item-img" aria-hidden="true">👟</div>
+            <div class="item-info">
+              <div class="item-name">Tenis Nike Air Max 270</div>
+              <div class="item-qty">Cantidad: 1</div>
+            </div>
+            <div class="item-price">$2,499.00</div>
+          </div>
+          <div class="item">
+            <div class="item-img" aria-hidden="true">🧦</div>
+            <div class="item-info">
+              <div class="item-name">Calcetas deportivas (3 pares)</div>
+              <div class="item-qty">Cantidad: 2</div>
+            </div>
+            <div class="item-price">$378.00</div>
+          </div>
+        </div>
+        <div class="totals">
+          <div class="total-row">
+            <span>Subtotal</span><span>$2,877.00</span>
+          </div>
+          <div class="total-row">
+            <span>Envío</span><span>$99.00</span>
+          </div>
+          <div class="total-row final">
+            <span>Total</span><span>$2,976.00 MXN</span>
+          </div>
+        </div>
+        <div class="trust-badges">
+          <div class="trust-badge">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z"/>
+            </svg>
+            Pago seguro
+          </div>
+          <div class="trust-badge">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M3 8l3.5 3.5L13 5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Garantía 30 días
+          </div>
+          <div class="trust-badge">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <circle cx="8" cy="8" r="6.5"/>
+              <path d="M8 5v4l2.5 1.5" stroke-linecap="round"/>
+            </svg>
+            Entrega 3-5 días
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<!-- SUCCESS SCREEN (full-page overlay) -->
+<div id="successScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; overflow-y:auto;">
+  <header class="topbar">
+    <div class="logo">Urban<span>Market</span></div>
+  </header>
+  <div style="max-width:480px; margin:60px auto; padding:20px;">
+    <div class="card">
+      <div class="card-body">
+        <div class="success-screen show">
+          <div class="checkmark-wrap" aria-hidden="true">
+            <svg width="44" height="44" viewBox="0 0 52 52">
+              <circle class="checkmark-circle" cx="26" cy="26" r="25"/>
+              <path class="checkmark-tick" d="M14 27l8 8 16-16"/>
+            </svg>
+          </div>
+          <h2>¡Pago exitoso!</h2>
+          <p>Tu pedido ha sido confirmado y está en proceso.</p>
+          <div class="receipt" id="receiptDetails">
+            <div class="receipt-row">
+              <span class="label">Payment ID</span>
+              <span class="value" id="rPaymentId">—</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Order ID</span>
+              <span class="value" id="rOrderId">—</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Método</span>
+              <span class="value" id="rMethod">—</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Proveedor</span>
+              <span class="value" id="rProvider">—</span>
+            </div>
+            <div class="receipt-row total">
+              <span class="label">Total pagado</span>
+              <span class="value" id="rAmount">—</span>
+            </div>
+          </div>
+          <a href="#" class="back-btn" onclick="location.reload(); return false;">Volver al inicio</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  const BASE   = 'http://localhost:3011';
+  const ORDER  = { id: 'ord_demo_urbanmarket_001', amount: 2976.00, currency: 'MXN' };
+  let   ikey   = uuid();
+  let   method = 'card';
+
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  const token = sessionStorage.getItem('ssp_jwt');
+
+  // ── UUID ──────────────────────────────────────────────────────────────────
+  function uuid() {
+    return (crypto.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    }));
+  }
+
+  // ── METHOD TABS ───────────────────────────────────────────────────────────
+  function selectMethod(m) {
+    method = m;
+    document.getElementById('tab-card').classList.toggle('active', m === 'card');
+    document.getElementById('tab-paypal').classList.toggle('active', m === 'paypal');
+    document.getElementById('tab-card').setAttribute('aria-selected', m === 'card');
+    document.getElementById('tab-paypal').setAttribute('aria-selected', m === 'paypal');
+    document.getElementById('panel-card').style.display   = m === 'card'   ? 'block' : 'none';
+    document.getElementById('panel-paypal').style.display = m === 'paypal' ? 'block' : 'none';
+    // Fresh idempotency key per method switch
+    ikey = uuid();
+  }
+
+  // ── CARD NUMBER FORMAT ────────────────────────────────────────────────────
+  function formatCardNumber(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 16);
+    el.value = v.match(/.{1,4}/g)?.join(' ') ?? v;
+    // Brand detection
+    const raw = v;
+    const icon = document.getElementById('iconVisa');
+    if (/^4/.test(raw)) {
+      icon.innerHTML = '<rect width="32" height="20" rx="3" fill="#1A1F71"/><text x="4" y="14" font-family="Helvetica" font-size="9" font-weight="bold" fill="white">VISA</text>';
+    } else if (/^5[1-5]/.test(raw)) {
+      icon.innerHTML = '<rect width="32" height="20" rx="3" fill="#EB001B" opacity=".15"/><circle cx="12" cy="10" r="7" fill="#EB001B"/><circle cx="20" cy="10" r="7" fill="#F79E1B"/><ellipse cx="16" cy="10" rx="3" ry="7" fill="#FF5F00"/>';
+    } else if (/^3[47]/.test(raw)) {
+      icon.innerHTML = '<rect width="32" height="20" rx="3" fill="#007BC1"/><text x="3" y="14" font-family="Helvetica" font-size="7" font-weight="bold" fill="white">AMEX</text>';
+    } else {
+      icon.innerHTML = '<rect width="32" height="20" rx="3" fill="#e5e7eb"/><text x="5" y="14" font-family="Helvetica" font-size="9" fill="#9ca3af">CARD</text>';
+    }
+  }
+
+  function formatExpiry(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 4);
+    if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+    el.value = v;
+  }
+
+  // ── VALIDATION ────────────────────────────────────────────────────────────
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.add('show');
+    document.getElementById(id.replace('Err',''))?.classList.add('error');
+  }
+  function clearErr(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('show');
+    document.getElementById(id.replace('Err',''))?.classList.remove('error');
+  }
+
+  function validateCard() {
+    let ok = true;
+    ['cardNumberErr','cardNameErr','cardExpiryErr','cardCvcErr'].forEach(clearErr);
+
+    const num = document.getElementById('cardNumber').value.replace(/\s/g,'');
+    if (num.length < 13) { showErr('cardNumberErr', 'Número inválido'); ok = false; }
+
+    const name = document.getElementById('cardName').value.trim();
+    if (!name) { showErr('cardNameErr', 'Ingresa el nombre del titular'); ok = false; }
+
+    const exp = document.getElementById('cardExpiry').value;
+    if (!/^\d{2}\/\d{2}$/.test(exp)) { showErr('cardExpiryErr', 'Formato MM/AA'); ok = false; }
+
+    const cvc = document.getElementById('cardCvc').value;
+    if (cvc.length < 3) { showErr('cardCvcErr', 'CVC inválido'); ok = false; }
+
+    return ok;
+  }
+
+  // ── CARD SUBMIT ───────────────────────────────────────────────────────────
+  async function submitCard(e) {
+    e.preventDefault();
+    if (!validateCard()) return;
+
+    const btn = document.getElementById('cardSubmit');
+    const errEl = document.getElementById('cardError');
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+
+    try {
+      const res = await callAPI('POST', '/api/payments', {
+        orderId: ORDER.id, amount: ORDER.amount, currency: ORDER.currency, method: 'card'
+      });
+      if (res.ok) {
+        showSuccess(res.data);
+      } else {
+        document.getElementById('cardErrorMsg').textContent = res.data?.message ?? 'Error desconocido';
+        errEl.classList.add('show');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Pagar $2,976.00 MXN';
+    }
+  }
+
+  // ── PAYPAL FLOW ───────────────────────────────────────────────────────────
+  function startPaypal() {
+    ikey = uuid();
+    document.getElementById('paypalCta').style.display = 'none';
+    const redirect = document.getElementById('paypalRedirect');
+    redirect.classList.add('show');
+
+    // Animate progress bar
+    requestAnimationFrame(() => {
+      document.getElementById('ppBar').style.width = '100%';
+    });
+
+    setTimeout(async () => {
+      const errEl = document.getElementById('paypalError');
+      errEl.classList.remove('show');
+      try {
+        const res = await callAPI('POST', '/api/payments/external', {
+          orderId: ORDER.id, amount: ORDER.amount, currency: ORDER.currency,
+          method: 'paypal', provider: 'paypal',
+          payer: { email: 'demo@urbanmarket.mx' }
+        });
+        if (res.ok) {
+          showSuccess(res.data);
+        } else {
+          redirect.classList.remove('show');
+          document.getElementById('paypalCta').style.display = 'block';
+          document.getElementById('paypalErrorMsg').textContent = res.data?.message ?? 'Error desconocido';
+          errEl.classList.add('show');
+        }
+      } catch {
+        redirect.classList.remove('show');
+        document.getElementById('paypalCta').style.display = 'block';
+        document.getElementById('paypalErrorMsg').textContent = 'No se pudo conectar con el servidor.';
+        errEl.classList.add('show');
+      }
+    }, 2200);
+  }
+
+  // ── API HELPER ────────────────────────────────────────────────────────────
+  async function callAPI(method, path, body) {
+    const headers = { 'Content-Type': 'application/json', 'Idempotency-Key': ikey };
+    const t = sessionStorage.getItem('ssp_jwt');
+    if (t) headers['Authorization'] = 'Bearer ' + t;
+
+    const r = await fetch(BASE + path, { method, headers, body: JSON.stringify(body) });
+    let data;
+    try { data = await r.json(); } catch { data = {}; }
+    return { ok: r.ok, status: r.status, data };
+  }
+
+  // ── SUCCESS ───────────────────────────────────────────────────────────────
+  function showSuccess(payment) {
+    document.getElementById('rPaymentId').textContent = payment.id ?? '—';
+    document.getElementById('rOrderId').textContent   = payment.orderId ?? '—';
+    document.getElementById('rMethod').textContent    = payment.method ?? '—';
+    document.getElementById('rProvider').textContent  = payment.provider ?? '—';
+    document.getElementById('rAmount').textContent    =
+      '$' + (payment.amount ?? ORDER.amount).toLocaleString('es-MX', {minimumFractionDigits:2}) + ' ' + (payment.currency ?? ORDER.currency);
+
+    document.getElementById('successScreen').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
