@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopScale — Dev Console</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #07090d;
+      --surface:     #0d1117;
+      --surface-2:   #161b22;
+      --surface-3:   #1c2129;
+      --border:      #21262d;
+      --border-2:    #30363d;
+      --accent:      #00e87a;
+      --accent-dim:  rgba(0,232,122,.08);
+      --accent-glow: 0 0 18px rgba(0,232,122,.18);
+      --blue:        #58a6ff;
+      --blue-dim:    rgba(88,166,255,.08);
+      --orange:      #f0883e;
+      --red:         #f85149;
+      --red-dim:     rgba(248,81,73,.08);
+      --yellow:      #e3b341;
+      --text:        #e6edf3;
+      --text-2:      #8b949e;
+      --text-3:      #3d444d;
+      --mono:        'Courier New','Lucida Console','Menlo',monospace;
+      --r:           5px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      font-family: var(--mono);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image:
+        linear-gradient(rgba(255,255,255,.013) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.013) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    /* ── TOPBAR ─────────────────────────────── */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 14px; height: 50px;
+      background: rgba(7,9,13,.94);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-brand {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .topbar-brand svg { width: 15px; height: 15px; }
+
+    .topbar-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+    .topbar-url { flex: 1; min-width: 0; }
+    .topbar-url input {
+      width: 100%; font-family: var(--mono); font-size: 12px;
+      padding: 5px 9px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--r);
+      color: var(--text-2); outline: none;
+      transition: border-color .15s, color .15s;
+    }
+    .topbar-url input:focus { border-color: var(--accent); color: var(--text); }
+
+    .token-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 9px; border-radius: var(--r);
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 11px; color: var(--text-2);
+      cursor: pointer; transition: border-color .15s, color .15s;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .token-pill:hover { border-color: var(--border-2); color: var(--text); }
+    .token-pill.active { color: var(--accent); border-color: rgba(0,232,122,.3); }
+    .token-pill svg { width: 11px; height: 11px; }
+
+    .health {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; color: var(--text-3); flex-shrink: 0;
+    }
+    .health-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-3); transition: background .3s;
+    }
+    .health-dot.ok  { background: var(--accent); box-shadow: 0 0 5px var(--accent); animation: hpulse 2.5s ease infinite; }
+    .health-dot.err { background: var(--red);    box-shadow: 0 0 5px var(--red); }
+
+    @keyframes hpulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+    /* ── LAYOUT ─────────────────────────────── */
+    .layout {
+      flex: 1; display: grid;
+      grid-template-columns: 400px 1fr;
+    }
+
+    /* ── FORMS PANEL ────────────────────────── */
+    .forms-panel {
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+
+    .tabs {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 6px; background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-2); font-family: var(--mono);
+      font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+      cursor: pointer; transition: color .15s, border-color .15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active           { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn.active.t-paypal  { color: var(--blue);   border-bottom-color: var(--blue); }
+    .tab-btn.active.t-lookup  { color: var(--orange);  border-bottom-color: var(--orange); }
+
+    .tab-pane { display: none; flex-direction: column; gap: 13px; padding: 18px; overflow-y: auto; flex: 1; }
+    .tab-pane.active { display: flex; }
+
+    /* ── FIELDS ─────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label {
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-2);
+    }
+    .field-hint { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+
+    .field input, .field select {
+      font-family: var(--mono); font-size: 13px;
+      padding: 7px 9px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--r);
+      color: var(--text); outline: none;
+      transition: border-color .15s, box-shadow .15s; width: 100%;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent); box-shadow: var(--accent-glow);
+    }
+    .field select option { background: var(--surface-2); }
+    .field input[disabled] { opacity: .45; cursor: default; }
+
+    .row { display: flex; gap: 8px; }
+    .row .field { flex: 1; }
+
+    .ikey-row { display: flex; gap: 6px; align-items: flex-end; }
+    .ikey-row .field { flex: 1; }
+
+    .icon-btn {
+      width: 34px; height: 34px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--text-2); cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--border-2); background: var(--surface-2); }
+    .icon-btn svg { width: 13px; height: 13px; }
+
+    .divider { height: 1px; background: var(--border); }
+
+    .submit-btn {
+      width: 100%; padding: 10px; margin-top: 2px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(0,232,122,.28);
+      border-radius: var(--r); color: var(--accent);
+      font-family: var(--mono); font-size: 11px;
+      font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      cursor: pointer; transition: background .15s, box-shadow .15s;
+    }
+    .submit-btn:hover { background: rgba(0,232,122,.14); box-shadow: var(--accent-glow); }
+    .submit-btn:active { transform: scale(.99); }
+    .submit-btn.s-paypal {
+      background: var(--blue-dim); border-color: rgba(88,166,255,.28); color: var(--blue);
+    }
+    .submit-btn.s-paypal:hover { background: rgba(88,166,255,.14); box-shadow: 0 0 18px rgba(88,166,255,.18); }
+    .submit-btn.s-lookup {
+      background: rgba(240,136,62,.08); border-color: rgba(240,136,62,.28); color: var(--orange);
+    }
+    .submit-btn.s-lookup:hover { background: rgba(240,136,62,.14); box-shadow: 0 0 18px rgba(240,136,62,.18); }
+
+    .badge-static {
+      font-size: 11px; padding: 5px 9px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--text-3); cursor: default;
+    }
+
+    /* ── RESPONSE PANEL ─────────────────────── */
+    .response-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+    .resp-header {
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+      padding: 9px 14px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .status-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 7px;
+      border-radius: 4px; min-width: 38px; text-align: center;
+      letter-spacing: .04em;
+    }
+    .s0 { background: var(--surface-2);           color: var(--text-3); border: 1px solid var(--border); }
+    .s2 { background: rgba(0,232,122,.12);         color: var(--accent); border: 1px solid rgba(0,232,122,.28); }
+    .s3 { background: rgba(88,166,255,.12);        color: var(--blue);   border: 1px solid rgba(88,166,255,.28); }
+    .s4 { background: var(--red-dim);              color: var(--red);    border: 1px solid rgba(248,81,73,.28); }
+    .s5 { background: rgba(240,136,62,.1);         color: var(--orange); border: 1px solid rgba(240,136,62,.28); }
+
+    .resp-ms   { font-size: 11px; color: var(--text-3); }
+    .resp-path { flex: 1; font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .copy-btn  {
+      padding: 3px 7px; background: none;
+      border: 1px solid var(--border); border-radius: 3px;
+      color: var(--text-3); font-family: var(--mono); font-size: 10px;
+      cursor: pointer; transition: color .1s, border-color .1s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--border-2); }
+
+    .resp-body-wrap {
+      flex: 1; overflow-y: auto; padding: 14px;
+      background: var(--bg); position: relative;
+    }
+    /* CRT scanline effect */
+    .resp-body-wrap::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px);
+    }
+    .resp-body {
+      font-family: var(--mono); font-size: 12px; line-height: 1.75;
+      white-space: pre; position: relative; z-index: 1; color: var(--text-2);
+    }
+    .resp-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; text-align: center; font-size: 12px;
+      color: var(--text-3); line-height: 2.2; position: relative; z-index: 1;
+    }
+
+    /* JSON colors */
+    .jk { color: var(--blue); }
+    .js { color: var(--accent); }
+    .jn { color: var(--orange); }
+    .jb { color: var(--red); }
+    .jz { color: var(--text-3); }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .cursor::after { content:'▋'; color:var(--accent); animation: blink .7s step-end infinite; }
+
+    /* ── HISTORY ─────────────────────────────── */
+    .history {
+      flex-shrink: 0; border-top: 1px solid var(--border);
+      background: var(--surface); max-height: 155px; overflow-y: auto;
+    }
+    .history-hd {
+      padding: 7px 14px; font-size: 10px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .history-empty { padding: 9px 14px; font-size: 11px; color: var(--text-3); }
+    .history-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 14px; font-size: 11px;
+      cursor: pointer; border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item:hover { background: var(--surface-2); }
+    .hm {
+      font-size: 9px; font-weight: 700; padding: 2px 5px;
+      border-radius: 3px; width: 32px; text-align: center; flex-shrink: 0;
+    }
+    .hm.POST { background: rgba(0,232,122,.1); color: var(--accent); }
+    .hm.GET  { background: var(--blue-dim);   color: var(--blue); }
+    .hp { color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hs { font-size: 10px; }
+    .hs.ok  { color: var(--accent); }
+    .hs.err { color: var(--red); }
+    .ht { font-size: 10px; color: var(--text-3); flex-shrink: 0; }
+
+    /* ── DEV TOOLS ───────────────────────────── */
+    .devtools { border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+    .devtools-toggle {
+      width: 100%; display: flex; align-items: center; gap: 7px;
+      padding: 9px 14px; background: none; border: none;
+      color: var(--text-3); font-family: var(--mono); font-size: 10px;
+      letter-spacing: .08em; text-transform: uppercase;
+      cursor: pointer; text-align: left; transition: color .15s;
+    }
+    .devtools-toggle:hover { color: var(--text-2); }
+    .devtools-toggle svg { width: 11px; height: 11px; transition: transform .2s; flex-shrink: 0; }
+    .devtools-toggle.open svg { transform: rotate(90deg); }
+
+    .devtools-body { display: none; padding: 0 14px 14px; flex-direction: column; gap: 10px; }
+    .devtools-body.open { display: flex; }
+
+    .drow { display: flex; gap: 8px; align-items: flex-end; }
+    .drow .field { flex: 1; }
+
+    .dbtn {
+      padding: 7px 12px; height: 34px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--text-2); font-family: var(--mono);
+      font-size: 11px; cursor: pointer; white-space: nowrap;
+      transition: color .15s, border-color .15s;
+    }
+    .dbtn:hover { color: var(--text); border-color: var(--border-2); }
+
+    .token-display {
+      font-size: 10px; padding: 8px 9px; line-height: 1.6;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--text-3); word-break: break-all;
+    }
+    .token-display.set { color: var(--accent); border-color: rgba(0,232,122,.2); }
+
+    .dbtn-row { display: flex; align-items: center; gap: 8px; }
+    .apply-btn {
+      padding: 4px 9px; background: none;
+      border: 1px solid rgba(0,232,122,.3); border-radius: 3px;
+      color: var(--accent); font-family: var(--mono); font-size: 10px;
+      cursor: pointer; transition: background .1s;
+    }
+    .apply-btn:hover { background: var(--accent-dim); }
+    .token-note { font-size: 10px; color: var(--text-3); }
+
+    .alert {
+      font-size: 11px; padding: 6px 9px; border-radius: var(--r);
+      border-left: 2px solid; line-height: 1.5;
+    }
+    .alert-warn { background: rgba(227,179,65,.07); border-color: var(--yellow); color: var(--yellow); }
+    .alert-info { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+
+    /* ── SCROLLBARS ──────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    /* ── RESPONSIVE ──────────────────────────── */
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .forms-panel { border-right: none; border-bottom: 1px solid var(--border); }
+      .response-panel { min-height: 380px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── TOPBAR ── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <rect x="1" y="4" width="14" height="9" rx="1.5"/>
+      <path d="M1 7h14M5 10.5h2M9 10.5h2" stroke-linecap="round"/>
+    </svg>
+    ShopScale Pay
+  </div>
+
+  <div class="topbar-sep"></div>
+
+  <div class="topbar-url">
+    <input type="text" id="baseUrl" value="http://localhost:3011"
+           aria-label="URL base de la API" autocomplete="off"/>
+  </div>
+
+  <button class="token-pill" id="tokenPill" onclick="focusDevTools()" aria-label="Estado del token de autenticación">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="3.5"/>
+      <path d="M10 10l3.5 3.5" stroke-linecap="round"/>
+    </svg>
+    <span id="tokenLabel">sin token</span>
+  </button>
+
+  <div class="health" aria-live="polite" aria-label="Estado de la API">
+    <div class="health-dot" id="healthDot" title="Estado: verificando..."></div>
+    <span id="healthLabel" style="display:none"></span>
+  </div>
+</header>
+
+<!-- ── MAIN ── -->
+<main class="layout">
+
+  <!-- FORMS -->
+  <section class="forms-panel" aria-label="Formularios">
+
+    <div class="tabs" role="tablist" aria-label="Tipo de operación">
+      <button class="tab-btn active"          role="tab" aria-selected="true"  aria-controls="pane-interno"  onclick="switchTab('interno')">Pago Interno</button>
+      <button class="tab-btn t-paypal"        role="tab" aria-selected="false" aria-controls="pane-paypal"   onclick="switchTab('paypal')">PayPal</button>
+      <button class="tab-btn t-lookup"        role="tab" aria-selected="false" aria-controls="pane-lookup"   onclick="switchTab('lookup')">Consultar</button>
+    </div>
+
+    <!-- ── Pago Interno ── -->
+    <div class="tab-pane active" id="pane-interno" role="tabpanel" aria-labelledby="tab-interno">
+
+      <div class="field">
+        <label for="i-ikey">Idempotency-Key</label>
+        <div class="ikey-row">
+          <div class="field" style="margin:0">
+            <input type="text" id="i-ikey" autocomplete="off" aria-describedby="i-ikey-hint"/>
+          </div>
+          <button class="icon-btn" onclick="freshKey('i-ikey')" title="Regenerar UUID" aria-label="Regenerar Idempotency-Key">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M13.5 2.5A6.5 6.5 0 1 0 14.5 8" stroke-linecap="round"/>
+              <polyline points="11.5,1 13.5,3 11.5,5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <span id="i-ikey-hint" class="field-hint">Mín. 8 caracteres — se auto-genera al cargar.</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label for="i-order">Order ID</label>
+        <input type="text" id="i-order" placeholder="ord_1234567890" autocomplete="off"/>
+        <span class="field-hint">Debe comenzar con <code>ord_</code></span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="i-amount">Monto</label>
+          <input type="number" id="i-amount" placeholder="100.00" min="0.01" step="0.01"/>
+        </div>
+        <div class="field" style="max-width:90px">
+          <label for="i-currency">Moneda</label>
+          <input type="text" id="i-currency" placeholder="MXN" maxlength="3" style="text-transform:uppercase"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="i-method">Método</label>
+        <select id="i-method" aria-label="Método de pago">
+          <option value="card">card — Tarjeta</option>
+          <option value="cash">cash — Efectivo</option>
+        </select>
+      </div>
+
+      <button class="submit-btn" onclick="doInterno()">→ Procesar Pago Interno</button>
+    </div>
+
+    <!-- ── PayPal ── -->
+    <div class="tab-pane" id="pane-paypal" role="tabpanel" aria-labelledby="tab-paypal">
+
+      <div class="field">
+        <label for="p-ikey">Idempotency-Key</label>
+        <div class="ikey-row">
+          <div class="field" style="margin:0">
+            <input type="text" id="p-ikey" autocomplete="off"/>
+          </div>
+          <button class="icon-btn" onclick="freshKey('p-ikey')" title="Regenerar UUID" aria-label="Regenerar Idempotency-Key">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M13.5 2.5A6.5 6.5 0 1 0 14.5 8" stroke-linecap="round"/>
+              <polyline points="11.5,1 13.5,3 11.5,5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <span class="field-hint">Mín. 8 caracteres.</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label for="p-order">Order ID</label>
+        <input type="text" id="p-order" placeholder="ord_1234567890" autocomplete="off"/>
+        <span class="field-hint">Debe comenzar con <code>ord_</code></span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="p-amount">Monto</label>
+          <input type="number" id="p-amount" placeholder="100.00" min="0.01" step="0.01"/>
+        </div>
+        <div class="field" style="max-width:90px">
+          <label for="p-currency">Moneda</label>
+          <input type="text" id="p-currency" placeholder="USD" maxlength="3" style="text-transform:uppercase"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Método / Proveedor</label>
+        <input type="text" value="paypal / paypal" disabled aria-label="Método y proveedor (fijos)"/>
+        <span class="field-hint">Fijos para pagos externos.</span>
+      </div>
+
+      <div class="field">
+        <label for="p-email">Email del Pagador <span style="color:var(--text-3);font-size:10px">(opcional)</span></label>
+        <input type="email" id="p-email" placeholder="pagador@ejemplo.com"/>
+      </div>
+
+      <button class="submit-btn s-paypal" onclick="doPaypal()">→ Procesar Pago PayPal</button>
+    </div>
+
+    <!-- ── Consultar ── -->
+    <div class="tab-pane" id="pane-lookup" role="tabpanel" aria-labelledby="tab-lookup">
+
+      <div class="field">
+        <label for="l-id">Payment ID</label>
+        <input type="text" id="l-id" placeholder="507f1f77bcf86cd799439011" autocomplete="off"
+               aria-describedby="l-id-hint"/>
+        <span id="l-id-hint" class="field-hint">ObjectId de MongoDB (24 chars hex).</span>
+      </div>
+
+      <button class="submit-btn s-lookup" onclick="doLookup()">→ Consultar Pago</button>
+
+      <div class="alert alert-info">
+        Puedes hacer click en cualquier elemento del historial para rellenar este campo automáticamente.
+      </div>
+    </div>
+
+  </section>
+
+  <!-- RESPONSE -->
+  <section class="response-panel" aria-label="Respuesta de la API">
+
+    <div class="resp-header">
+      <span class="status-badge s0" id="sBadge" aria-live="polite">—</span>
+      <span class="resp-ms" id="sMs"></span>
+      <span class="resp-path" id="sPath">esperando solicitud…</span>
+      <button class="copy-btn" onclick="copyResp()" aria-label="Copiar respuesta JSON">copiar</button>
+    </div>
+
+    <div class="resp-body-wrap">
+      <div class="resp-body" id="respBody">
+        <span class="resp-empty">Envía una solicitud para ver la respuesta aquí.
+
+POST  /api/payments
+POST  /api/payments/external
+GET   /api/payments/:paymentId</span>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="history" aria-label="Historial de solicitudes">
+      <div class="history-hd">Historial — últimas 5</div>
+      <div id="histList"><div class="history-empty">Sin solicitudes aún.</div></div>
+    </div>
+
+  </section>
+</main>
+
+<!-- ── DEV TOOLS ── -->
+<footer class="devtools" id="devtools">
+  <button class="devtools-toggle" id="dtToggle" onclick="toggleDT()" aria-expanded="false" aria-controls="dtBody">
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <polyline points="3,2 7,6 3,10" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Dev Tools — Generador de JWT
+  </button>
+
+  <div class="devtools-body" id="dtBody" aria-hidden="true">
+    <div class="alert alert-warn">
+      El JWT se genera completamente en tu navegador. Nunca salgas de esta página hacia un servidor externo con tu JWT_SECRET.
+    </div>
+
+    <div class="drow">
+      <div class="field">
+        <label for="jwtSecret">JWT_SECRET (de tu <code>.env</code>)</label>
+        <input type="password" id="jwtSecret" placeholder="tu-secreto-aquí" autocomplete="off"/>
+      </div>
+      <button class="dbtn" onclick="genToken()">Generar</button>
+    </div>
+
+    <div class="token-display" id="tokenDisplay">— el token aparecerá aquí —</div>
+
+    <div class="dbtn-row">
+      <button class="copy-btn" onclick="copyToken()">Copiar</button>
+      <button class="apply-btn" onclick="applyToken()">Usar en solicitudes</button>
+      <span class="token-note" id="tokenNote" aria-live="polite"></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── ESTADO ───────────────────────────────────────────────────────────────
+  let token = sessionStorage.getItem('ssp_jwt') || '';
+  let lastResp = null;
+  const hist = [];
+
+  // ── INIT ─────────────────────────────────────────────────────────────────
+  freshKey('i-ikey');
+  freshKey('p-ikey');
+  syncTokenPill();
+  checkHealth();
+  setInterval(checkHealth, 30_000);
+
+  // ── UUID ──────────────────────────────────────────────────────────────────
+  function uuid() {
+    return (crypto.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    }));
+  }
+
+  function freshKey(id) { document.getElementById(id).value = uuid(); }
+
+  // ── TABS ──────────────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+    document.getElementById('pane-' + name).classList.add('active');
+    const btn = [...document.querySelectorAll('.tab-btn')].find(b =>
+      (name === 'interno' && b.textContent.includes('Interno')) ||
+      (name === 'paypal'  && b.textContent.includes('PayPal'))  ||
+      (name === 'lookup'  && b.textContent.includes('Consultar'))
+    );
+    if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+  }
+
+  // ── HEALTH ────────────────────────────────────────────────────────────────
+  async function checkHealth() {
+    const dot = document.getElementById('healthDot');
+    try {
+      const r = await fetch(base() + '/health', { signal: AbortSignal.timeout(3000) });
+      const d = await r.json();
+      const ok = d.status === 'ok';
+      dot.className = 'health-dot ' + (ok ? 'ok' : 'err');
+      dot.title = 'API: ' + d.status;
+    } catch {
+      dot.className = 'health-dot err';
+      dot.title = 'API no disponible';
+    }
+  }
+
+  document.getElementById('baseUrl').addEventListener('change', checkHealth);
+
+  function base() { return document.getElementById('baseUrl').value.trim().replace(/\/$/, ''); }
+
+  // ── TOKEN ─────────────────────────────────────────────────────────────────
+  function syncTokenPill() {
+    const pill = document.getElementById('tokenPill');
+    const label = document.getElementById('tokenLabel');
+    if (token) {
+      label.textContent = token.slice(0,16) + '…';
+      pill.classList.add('active');
+    } else {
+      label.textContent = 'sin token';
+      pill.classList.remove('active');
+    }
+  }
+
+  function focusDevTools() {
+    const body = document.getElementById('dtBody');
+    const toggle = document.getElementById('dtToggle');
+    if (!body.classList.contains('open')) {
+      body.classList.add('open');
+      toggle.classList.add('open');
+      toggle.setAttribute('aria-expanded','true');
+      body.setAttribute('aria-hidden','false');
+    }
+    document.getElementById('devtools').scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => document.getElementById('jwtSecret').focus(), 280);
+  }
+
+  // ── JWT GENERATOR ─────────────────────────────────────────────────────────
+  async function genToken() {
+    const secret = document.getElementById('jwtSecret').value;
+    if (!secret) { note('Ingresa el JWT_SECRET primero.'); return; }
+
+    const b64u = o => btoa(JSON.stringify(o)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const now = Math.floor(Date.now() / 1000);
+    const hdr = b64u({ alg:'HS256', typ:'JWT' });
+    const pay = b64u({ sub:'dev-user', role:'admin', iat:now, exp:now+3600 });
+    const msg = hdr + '.' + pay;
+
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret),
+      { name:'HMAC', hash:'SHA-256' }, false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+      .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+
+    const jwt = msg + '.' + sigB64;
+    const td = document.getElementById('tokenDisplay');
+    td.textContent = jwt;
+    td.classList.add('set');
+    note('Expira: ' + new Date((now + 3600) * 1000).toLocaleTimeString('es-MX'));
+  }
+
+  function copyToken() {
+    const t = document.getElementById('tokenDisplay').textContent;
+    if (t.startsWith('—')) return;
+    navigator.clipboard.writeText(t).then(() => note('¡Copiado al portapapeles!'));
+  }
+
+  function applyToken() {
+    const t = document.getElementById('tokenDisplay').textContent;
+    if (t.startsWith('—')) { note('Primero genera un token.'); return; }
+    token = t;
+    sessionStorage.setItem('ssp_jwt', t);
+    syncTokenPill();
+    note('✓ Aplicado — todas las solicitudes lo usarán.');
+  }
+
+  function note(msg) {
+    const el = document.getElementById('tokenNote');
+    el.textContent = msg;
+    setTimeout(() => el.textContent = '', 4000);
+  }
+
+  // ── REQUEST ENGINE ────────────────────────────────────────────────────────
+  async function send(method, path, body, ikey) {
+    const headers = { 'Content-Type':'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (ikey)  headers['Idempotency-Key'] = ikey;
+
+    setLoading(method, path);
+    const t0 = performance.now();
+    let status = 0, data = null;
+
+    try {
+      const opts = { method, headers };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(base() + path, opts);
+      const ms = Math.round(performance.now() - t0);
+      status = r.status;
+      try { data = await r.json(); } catch { data = { _raw: await r.text() }; }
+      render(status, ms, method, path, data);
+    } catch (e) {
+      const ms = Math.round(performance.now() - t0);
+      data = { error: 'NetworkError', message: e.message, hint: 'Verifica que la API esté corriendo en ' + base() };
+      render(0, ms, method, path, data);
+    }
+
+    addHist(method, path, status, data);
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  function setLoading(method, path) {
+    document.getElementById('sBadge').className = 'status-badge s0';
+    document.getElementById('sBadge').textContent = '…';
+    document.getElementById('sMs').textContent = '';
+    document.getElementById('sPath').textContent = method + ' ' + path;
+    document.getElementById('respBody').innerHTML = '<span class="cursor" style="color:var(--text-3)">Cargando</span>';
+  }
+
+  function render(status, ms, method, path, data) {
+    lastResp = data;
+    const badge = document.getElementById('sBadge');
+    const cls = status === 0 ? 's0' : status < 300 ? 's2' : status < 400 ? 's3' : status < 500 ? 's4' : 's5';
+    badge.className = 'status-badge ' + cls;
+    badge.textContent = status || 'ERR';
+    document.getElementById('sMs').textContent = ms ? ms + ' ms' : '';
+    document.getElementById('sPath').textContent = method + ' ' + path;
+    document.getElementById('respBody').innerHTML = highlight(JSON.stringify(data, null, 2));
+  }
+
+  function highlight(json) {
+    return json.replace(
+      /("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      m => {
+        if (/^"/.test(m)) return /:$/.test(m)
+          ? '<span class="jk">' + m + '</span>'
+          : '<span class="js">' + m + '</span>';
+        if (/true|false/.test(m)) return '<span class="jb">' + m + '</span>';
+        if (/null/.test(m))       return '<span class="jz">' + m + '</span>';
+        return '<span class="jn">' + m + '</span>';
+      }
+    );
+  }
+
+  function copyResp() {
+    if (!lastResp) return;
+    navigator.clipboard.writeText(JSON.stringify(lastResp, null, 2));
+  }
+
+  // ── HISTORY ───────────────────────────────────────────────────────────────
+  function addHist(method, path, status, data) {
+    hist.unshift({ method, path, status, data, time: new Date().toLocaleTimeString('es-MX') });
+    if (hist.length > 5) hist.pop();
+    renderHist();
+  }
+
+  function renderHist() {
+    const el = document.getElementById('histList');
+    if (!hist.length) { el.innerHTML = '<div class="history-empty">Sin solicitudes aún.</div>'; return; }
+    el.innerHTML = hist.map((h, i) => {
+      const ok = h.status >= 200 && h.status < 300;
+      return `<div class="history-item" onclick="loadHist(${i})" role="button" tabindex="0"
+                   aria-label="${h.method} ${h.path} — estado ${h.status || 'Error'}">
+        <span class="hm ${h.method}">${h.method}</span>
+        <span class="hp">${h.path}</span>
+        <span class="hs ${ok?'ok':'err'}">${h.status || 'ERR'}</span>
+        <span class="ht">${h.time}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function loadHist(i) {
+    const h = hist[i];
+    if (!h) return;
+    render(h.status, 0, h.method, h.path, h.data);
+    if (h.method === 'GET' && h.path.startsWith('/api/payments/')) {
+      const id = h.path.replace('/api/payments/', '');
+      switchTab('lookup');
+      document.getElementById('l-id').value = id;
+    }
+  }
+
+  // keyboard support for history rows
+  document.addEventListener('keydown', e => {
+    if (e.target.classList.contains('history-item') && (e.key === 'Enter' || e.key === ' '))
+      e.target.click();
+  });
+
+  // ── VALIDATION ────────────────────────────────────────────────────────────
+  function validate(orderId, amount, currency, ikey) {
+    if (!orderId || !orderId.startsWith('ord_'))
+      return 'El orderId debe comenzar con "ord_" (ej: ord_abc123)';
+    if (!amount || isNaN(amount) || Number(amount) <= 0)
+      return 'El monto debe ser un número positivo';
+    if (!currency || currency.length !== 3)
+      return 'La moneda debe tener exactamente 3 caracteres (ej: MXN, USD)';
+    if (!ikey || ikey.length < 8 || ikey.length > 128)
+      return 'El Idempotency-Key debe tener entre 8 y 128 caracteres';
+    return null;
+  }
+
+  function warnNoToken() {
+    if (!token) return !confirm('No hay un token JWT configurado.\n¿Continuar de todas formas?\n(La API devolverá 401 Unauthorized)');
+    return false;
+  }
+
+  // ── SUBMIT HANDLERS ───────────────────────────────────────────────────────
+  async function doInterno() {
+    const ikey     = document.getElementById('i-ikey').value.trim();
+    const orderId  = document.getElementById('i-order').value.trim();
+    const amount   = parseFloat(document.getElementById('i-amount').value);
+    const currency = document.getElementById('i-currency').value.trim().toUpperCase();
+    const method   = document.getElementById('i-method').value;
+
+    const err = validate(orderId, amount, currency, ikey);
+    if (err) { alert(err); return; }
+    if (warnNoToken()) return;
+
+    await send('POST', '/api/payments', { orderId, amount, currency, method }, ikey);
+  }
+
+  async function doPaypal() {
+    const ikey     = document.getElementById('p-ikey').value.trim();
+    const orderId  = document.getElementById('p-order').value.trim();
+    const amount   = parseFloat(document.getElementById('p-amount').value);
+    const currency = document.getElementById('p-currency').value.trim().toUpperCase();
+    const email    = document.getElementById('p-email').value.trim();
+
+    const err = validate(orderId, amount, currency, ikey);
+    if (err) { alert(err); return; }
+    if (warnNoToken()) return;
+
+    const body = { orderId, amount, currency, method: 'paypal', provider: 'paypal' };
+    if (email) body.payer = { email };
+
+    await send('POST', '/api/payments/external', body, ikey);
+  }
+
+  async function doLookup() {
+    const id = document.getElementById('l-id').value.trim();
+    if (!id) { alert('Ingresa un Payment ID'); return; }
+    if (warnNoToken()) return;
+    await send('GET', '/api/payments/' + id, null, null);
+  }
+
+  // ── DEV TOOLS TOGGLE ─────────────────────────────────────────────────────
+  function toggleDT() {
+    const body   = document.getElementById('dtBody');
+    const toggle = document.getElementById('dtToggle');
+    const open   = body.classList.toggle('open');
+    toggle.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    body.setAttribute('aria-hidden', String(!open));
+  }
+</script>
+</body>
+</html>

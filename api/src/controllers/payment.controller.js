@@ -51,24 +51,31 @@ export const createPayment = async (req, res) => {
     return res.status(400).json({ error: "BadRequest", message: "method is not allowed for internal payments" });
   }
 
-  const result = await upsertWithOutbox(
-    { idempotencyKey },
-    {
-      orderId,
-      amount,
-      method,
-      currency: currency.toUpperCase(),
-      status: "approved",
-      provider: "internal",
-      providerReference: null,
-      idempotencyKey,
-      message: "Payment approved",
-    },
-    "payment.created"
-  );
+  try {
+    const result = await upsertWithOutbox(
+      { idempotencyKey },
+      {
+        orderId,
+        amount,
+        method,
+        currency: currency.toUpperCase(),
+        status: "approved",
+        provider: "internal",
+        providerReference: null,
+        idempotencyKey,
+        message: "Payment approved",
+      },
+      "payment.created"
+    );
 
-  const isNew = !result.lastErrorObject.updatedExisting;
-  return res.status(isNew ? 201 : 200).json(toPaymentResponse(result.value));
+    const isNew = !result.lastErrorObject.updatedExisting;
+    return res.status(isNew ? 201 : 200).json(toPaymentResponse(result.value));
+  } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.orderId) {
+      return res.status(409).json({ error: "Conflict", message: "A payment already exists for this orderId" });
+    }
+    throw err;
+  }
 };
 
 export const createExternalPayment = async (req, res) => {
@@ -79,24 +86,31 @@ export const createExternalPayment = async (req, res) => {
 
   const { orderId, amount, method, currency, provider } = req.body;
 
-  const result = await upsertWithOutbox(
-    { idempotencyKey },
-    {
-      orderId,
-      amount,
-      method,
-      currency: currency.toUpperCase(),
-      status: "approved",
-      provider,
-      providerReference: `PAYPAL-${Date.now()}`,
-      idempotencyKey,
-      message: "Approved by PayPal",
-    },
-    "payment.created"
-  );
+  try {
+    const result = await upsertWithOutbox(
+      { idempotencyKey },
+      {
+        orderId,
+        amount,
+        method,
+        currency: currency.toUpperCase(),
+        status: "approved",
+        provider,
+        providerReference: `PAYPAL-${Date.now()}`,
+        idempotencyKey,
+        message: "Approved by PayPal",
+      },
+      "payment.created"
+    );
 
-  const isNew = !result.lastErrorObject.updatedExisting;
-  return res.status(isNew ? 201 : 200).json(toPaymentResponse(result.value));
+    const isNew = !result.lastErrorObject.updatedExisting;
+    return res.status(isNew ? 201 : 200).json(toPaymentResponse(result.value));
+  } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.orderId) {
+      return res.status(409).json({ error: "Conflict", message: "A payment already exists for this orderId" });
+    }
+    throw err;
+  }
 };
 
 export const getPaymentById = async (req, res) => {
